@@ -95,7 +95,7 @@ def register():
     bpy.types.Scene.autorange_enabled = BoolProperty(
         name="Use AutoRange",
         description="AutoRange frames",
-        default = False
+        default=False
     )
     bpy.app.handlers.depsgraph_update_pre.append(update_frame_range_handler)
     bpy.types.TIME_MT_editor_menus.append(draw_autorange_property)
