@@ -1,3 +1,5 @@
+import math
+
 import bpy
 
 from bpy.props import BoolProperty
@@ -7,7 +9,7 @@ from bpy.utils import register_class, unregister_class
 bl_info = {
     "name": "AutoRange",
     "author": "Demian Karpunov",
-    "version": (0, 2),
+    "version": (0, 3),
     "blender": (3, 1, 2),
     "location": "Timeline -> Use AutoRange",
     "description": "Automatically set frame range by active object animation",
@@ -35,6 +37,12 @@ class AutoRange(bpy.types.Operator):
         scene = context.scene
         
         obj = context.active_object
+        if scene.autorange_acamera_enabled:
+            obj = scene.camera
+            if not obj:
+                self.report({"WARNING"}, "Active scene camera required")
+                return {"FINISHED"}
+        
         if not obj:
             self.report({"WARNING"}, "Active object required")
             return {"FINISHED"}
@@ -47,10 +55,14 @@ class AutoRange(bpy.types.Operator):
         # Find action range
         action = anim_data.action
         start, end = action.frame_range
-
-        # TODO: One key range
+        
         self.report({"DEBUG"}, f"Frame range: {start}-{end}")
         start, end = round(start), round(end)
+        
+        if (end - start) <= 1:
+            keyframes = get_keyframes(obj)
+            start, end = keyframes[0], keyframes[-1]
+            self.report({"DEBUG"}, f"Frame range actually one {start}-{end} frame")
         
         # Set frame range
         if not all([scene.frame_start == start, scene.frame_end == end]):
@@ -60,52 +72,97 @@ class AutoRange(bpy.types.Operator):
         return {"FINISHED"}
 
 
-def update_frame_range():
-    context = bpy.context
-    scene = context.scene
+
+class AutoRangeMenu(bpy.types.Menu):
+    bl_label = "AutoRange"
+    bl_idname = "TIME_MT_AutoRange"
+
+    def draw(self, context):
+        scene = context.scene
+        layout = self.layout
+        
+        layout.prop(scene, "autorange_enabled")
+        layout.separator()
+        
+        col = layout.column(heading="Settings")
+        col.prop(scene, "autorange_acamera_enabled")
+
+
+
+def get_keyframes(obj: bpy.types.Object):
+    keyframes = []
+    anim_data = obj.animation_data
+    if not anim_data or not anim_data.action:
+        return keyframes
+    
+    for fcu in anim_data.action.fcurves:
+        for keyframe in fcu.keyframe_points:
+            x, y = keyframe.co
+            if x not in keyframes:
+                keyframes.append((math.ceil(x)))
+    return keyframes
+
+
+def update_frame_range(scene: bpy.types.Scene):
     if not scene.autorange_enabled:
         return
     
     bpy.ops.scene.auto_range("EXEC_DEFAULT")
 
 
-def update_frame_range_handler(scene):
+def update_frame_range_handler(scene: bpy.types.Scene):
     global RANGE_UPDATE
     if RANGE_UPDATE:
         return
     
     RANGE_UPDATE = True
-    update_frame_range()
+    update_frame_range(scene)
     RANGE_UPDATE = False
 
 
-def draw_autorange_property(self, context):
+def draw_autorange_feature(self, context):
     scene = context.scene
     layout = self.layout
-
-    # call the property
-    layout.prop(scene, "autorange_enabled")
+    
+    layout.menu(AutoRangeMenu.bl_idname)
+    layout.prop(scene, "autorange_enabled", text="Use AutoRange")
 
 
 """ REGISTER """
 
 
 def register():
-    register_class(AutoRange)
     bpy.types.Scene.autorange_enabled = BoolProperty(
-        name="Use AutoRange",
+        name="Activate AutoRange",
         description="AutoRange frames",
         default=False
     )
+    
+    bpy.types.Scene.autorange_acamera_enabled = BoolProperty(
+        name="Range by Active Camera",
+        description="Use only AutoRange for scene Active Camera",
+        default=True
+    )
+    
+    register_class(AutoRange)
+    register_class(AutoRangeMenu)
+    
     bpy.app.handlers.depsgraph_update_pre.append(update_frame_range_handler)
-    bpy.types.TIME_MT_editor_menus.append(draw_autorange_property)
+    
+    bpy.types.TIME_MT_editor_menus.append(draw_autorange_feature)
 
 
 def unregister():
-    bpy.types.TIME_MT_editor_menus.remove(draw_autorange_property)
-    bpy.app.handlers.depsgraph_update_pre.remove(update_frame_range_handler)
-    del bpy.types.Scene.autorange_enabled
+    bpy.types.TIME_MT_editor_menus.remove(draw_autorange_feature)
+    
+    if update_frame_range_handler in bpy.app.handlers.depsgraph_update_pre:
+        bpy.app.handlers.depsgraph_update_pre.remove(update_frame_range_handler)
+    
+    unregister_class(AutoRangeMenu)
     unregister_class(AutoRange)
+    
+    del bpy.types.Scene.autorange_acamera_enabled
+    del bpy.types.Scene.autorange_enabled
 
 
 if __name__ == "__main__":
