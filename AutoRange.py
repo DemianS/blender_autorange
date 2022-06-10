@@ -72,20 +72,21 @@ class AutoRange(bpy.types.Operator):
         return {"FINISHED"}
 
 
-
-class AutoRangeMenu(bpy.types.Menu):
+class AutoRangePanel(bpy.types.Panel):
     bl_label = "AutoRange"
-    bl_idname = "TIME_MT_AutoRange"
+    bl_idname = "TIME_PT_AutoRange"
+    bl_space_type = "DOPESHEET_EDITOR"
+    bl_region_type = "HEADER"
+    bl_ui_units_x = 8
 
     def draw(self, context):
         scene = context.scene
         layout = self.layout
+        layout.active = scene.autorange_enabled
         
-        layout.prop(scene, "autorange_enabled")
-        layout.separator()
-        
-        col = layout.column(heading="Settings")
-        col.prop(scene, "autorange_acamera_enabled")
+        col = layout.column(heading="AutoRange by animation from")
+        col.prop(scene, "autorange_acamera_enabled", text="Any object", toggle=False, icon="OBJECT_DATA", invert_checkbox=True)
+        col.prop(scene, "autorange_acamera_enabled", text="Active camera", toggle=False, icon="CAMERA_DATA")
 
 
 
@@ -124,8 +125,16 @@ def draw_autorange_feature(self, context):
     scene = context.scene
     layout = self.layout
     
-    layout.menu(AutoRangeMenu.bl_idname)
-    layout.prop(scene, "autorange_enabled", text="Use AutoRange")
+    layout.separator_spacer()
+
+    row = layout.row(align=True)
+    row.prop(scene, "autorange_enabled", text="AutoRange", toggle=True, icon="PREVIEW_RANGE")
+    sub = row.row(align=True)
+    sub.active = scene.autorange_enabled
+    sub.popover(
+        panel="TIME_PT_AutoRange",
+        text=""
+    )
 
 
 """ REGISTER """
@@ -145,7 +154,7 @@ def register():
     )
     
     register_class(AutoRange)
-    register_class(AutoRangeMenu)
+    register_class(AutoRangePanel)
     
     bpy.app.handlers.depsgraph_update_pre.append(update_frame_range_handler)
     
@@ -158,7 +167,7 @@ def unregister():
     if update_frame_range_handler in bpy.app.handlers.depsgraph_update_pre:
         bpy.app.handlers.depsgraph_update_pre.remove(update_frame_range_handler)
     
-    unregister_class(AutoRangeMenu)
+    unregister_class(AutoRangePanel)
     unregister_class(AutoRange)
     
     del bpy.types.Scene.autorange_acamera_enabled
