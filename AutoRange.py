@@ -121,11 +121,11 @@ def update_frame_range_handler(scene: bpy.types.Scene):
     RANGE_UPDATE = False
 
 
-def draw_autorange_feature(self, context):
+def draw_autorange_feature(self, context: bpy.types.Context):
     scene = context.scene
     layout = self.layout
     
-    layout.separator_spacer()
+    layout.separator()
 
     row = layout.row(align=True)
     row.prop(scene, "autorange_enabled", text="AutoRange", toggle=True, icon="PREVIEW_RANGE")
