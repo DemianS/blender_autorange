@@ -4,6 +4,7 @@ import bpy
 
 from bpy.props import BoolProperty
 from bpy.utils import register_class, unregister_class
+from bpy.app.handlers import persistent
 
 
 bl_info = {
@@ -111,6 +112,7 @@ def update_frame_range(scene: bpy.types.Scene):
     bpy.ops.scene.auto_range("EXEC_DEFAULT")
 
 
+@persistent
 def update_frame_range_handler(scene: bpy.types.Scene):
     global RANGE_UPDATE
     if RANGE_UPDATE:
